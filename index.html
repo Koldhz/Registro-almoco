@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Registro de Almoço</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f0f0f0;
+      padding: 2rem;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    #clock {
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    input, button {
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      width: 100%;
+      font-size: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    th {
+      background: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <h1>Registro de Almoço</h1>
+  <div id="clock">00:00:00</div>
+  
+  <input type="text" id="nome" placeholder="Seu nome" />
+
+  <button onclick="registrar('saida')">Registrar Saída para Almoço</button>
+  <button onclick="registrar('retorno')">Registrar Retorno do Almoço</button>
+
+  <table id="registros">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Tipo</th>
+        <th>Horário</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    function atualizarRelogio() {
+      const agora = new Date();
+      const horas = agora.toLocaleTimeString('pt-BR');
+      document.getElementById('clock').textContent = horas;
+    }
+    setInterval(atualizarRelogio, 1000);
+    atualizarRelogio();
+
+    function registrar(tipo) {
+      const nome = document.getElementById('nome').value.trim();
+      if (!nome) {
+        alert("Informe seu nome antes de registrar.");
+        return;
+      }
+      const hora = new Date().toLocaleTimeString('pt-BR');
+      const tabela = document.getElementById('registros').querySelector('tbody');
+      const linha = tabela.insertRow();
+      linha.insertCell(0).textContent = nome;
+      linha.insertCell(1).textContent = tipo === 'saida' ? 'Saída' : 'Retorno';
+      linha.insertCell(2).textContent = hora;
+    }
+  </script>
+</body>
+</html>
