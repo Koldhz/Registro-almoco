@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Registro de Ponto</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f0f0f0;
+      padding: 2rem;
+      max-width: 700px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+    }
+    #clock {
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    input, button {
+      padding: 0.5rem;
+      margin: 0.3rem auto;
+      display: block;
+      font-size: 1rem;
+    }
+    input {
+      width: calc(100% - 1rem);
+    }
+    button {
+      width: 200px;
+    }
+    .botoes {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    th {
+      background: #ddd;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <h1>Registro de Ponto</h1>
+  <div id="clock">00:00:00</div>
+
+  <input type="text" id="nome" placeholder="Seu nome" />
+
+  <div class="botoes">
+    <button onclick="registrar()">Registrar</button>
+    <button onclick="exportarRegistros()">Exportar</button>
+    <button onclick="resetarRegistros()">Resetar Tudo</button>
+  </div>
+
+  <table id="registros">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Evento</th>
+        <th>Data</th>
+        <th>Hora</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let registros = JSON.parse(localStorage.getItem('registros')) || [];
+    limparAntigos(45);
+    let etapaPorData = calcularEtapasPorData();
+
+    function atualizarRelogio() {
+      const agora = new Date();
+      const horas = agora.toLocaleTimeString('pt-BR');
+      document.getElementById('clock').textContent = horas;
+    }
+    setInterval(atualizarRelogio, 1000);
+    atualizarRelogio();
+
+    function salvarLocal() {
+      localStorage.setItem('registros', JSON.stringify(registros));
+    }
+
+    function limparAntigos(dias) {
+      const limite = new Date();
+      limite.setDate(limite.getDate() - dias);
+      registros = registros.filter(r => {
+        const [dia, mes, ano] = r.data.split('/');
+        const dataReg = new Date(+ano, mes - 1, +dia);
+        return dataReg >= limite;
+      });
+      salvarLocal();
+    }
+
+    function calcularEtapasPorData() {
+      const mapa = {};
+      registros.forEach(r => {
+        const chave = r.nome + '|' + r.data;
+        if (!mapa[chave]) mapa[chave] = 0;
+        mapa[chave]++;
+      });
+      return mapa;
+    }
+
+    function registrar() {
+      const nomeInput = document.getElementById('nome');
+      const nome = nomeInput.value.trim();
+      if (!nome) {
+        alert("Digite o nome antes de registrar.");
+        return;
+      }
+
+      const agora = new Date();
+      const data = agora.toLocaleDateString('pt-BR');
+      const hora = agora.toLocaleTimeString('pt-BR');
+      const chave = nome + '|' + data;
+
+      const eventos = ["Entrada", "Saída para Almoço", "Retorno do Almoço", "Saída"];
+      let etapa = etapaPorData[chave] || 0;
+
+      if (etapa > 3) {
+        alert("Todos os registros já foram feitos para " + nome + " hoje.");
+        return;
+      }
+
+      registros.push({ nome, evento: eventos[etapa], data, hora });
+      etapaPorData[chave] = etapa + 1;
+      salvarLocal();
+      renderizarTabela();
+
+      if (etapa === 3) {
+        alert("Jornada finalizada para " + nome);
+        nomeInput.value = "";
+      }
+    }
+
+    function renderizarTabela() {
+      const corpo = document.querySelector("#registros tbody");
+      corpo.innerHTML = "";
+
+      const hoje = new Date().toLocaleDateString('pt-BR');
+
+      [...registros]
+        .reverse()
+        .filter(r => r.data === hoje)
+        .forEach(r => {
+          const linha = corpo.insertRow();
+          linha.insertCell().textContent = r.nome;
+          linha.insertCell().textContent = r.evento;
+          linha.insertCell().textContent = r.data;
+          linha.insertCell().textContent = r.hora;
+        });
+    }
+
+    async function exportarRegistros() {
+      const nomeFiltro = prompt("Digite o nome para filtrar (deixe em branco para todos):").trim().toLowerCase();
+      const formato = prompt("Escolha o formato: CSV ou PDF").trim().toLowerCase();
+
+      const registrosFiltrados = registros.filter(r => 
+        !nomeFiltro || r.nome.toLowerCase() === nomeFiltro
+      );
+
+      if (registrosFiltrados.length === 0) {
+        alert("Nenhum registro encontrado para exportar.");
+        return;
+      }
+
+      if (formato === "csv") {
+        let csv = "Nome,Evento,Data,Hora\n";
+        registrosFiltrados.forEach(r => {
+          csv += `"${r.nome}","${r.evento}","${r.data}","${r.hora}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.setAttribute("href", URL.createObjectURL(blob));
+        link.setAttribute("download", "registros.csv");
+        link.click();
+      } else if (formato === "pdf") {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(14);
+        doc.text("Registros Exportados", 14, 15);
+
+        let y = 25;
+        doc.setFontSize(10);
+        doc.text("Nome", 14, y);
+        doc.text("Evento", 64, y);
+        doc.text("Data", 114, y);
+        doc.text("Hora", 164, y);
+        y += 5;
+
+        registrosFiltrados.forEach(r => {
+          if (y > 280) {
+            doc.addPage();
+            y = 15;
+          }
+          doc.text(r.nome, 14, y);
+          doc.text(r.evento, 64, y);
+          doc.text(r.data, 114, y);
+          doc.text(r.hora, 164, y);
+          y += 7;
+        });
+
+        doc.save("registros.pdf");
+      } else {
+        alert("Formato inválido. Digite CSV ou PDF.");
+      }
+    }
+
+    function resetarRegistros() {
+      const senha = prompt("Digite a senha para resetar os registros:");
+      if (senha !== "oficial320f") {
+        alert("Senha incorreta. Ação cancelada.");
+        return;
+      }
+
+      const confirmado = confirm("Tem certeza que deseja apagar TODOS os registros?");
+      if (confirmado) {
+        registros = [];
+        etapaPorData = {};
+        salvarLocal();
+        renderizarTabela();
+        alert("Registros apagados com sucesso.");
+      }
+    }
+
+    renderizarTabela();
+  </script>
+  <p style="text-align: center; font-size: 0.7rem; color: #888; margin-top: 2rem;">
+  Criado por Koldhz
+</p>
+</body>
+</html>
